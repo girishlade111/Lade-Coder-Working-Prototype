@@ -1,0 +1,890 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lade Coder</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+            100% { transform: scale(1); }
+        }
+        
+        .message-animation {
+            animation: fadeIn 0.3s ease-out;
+        }
+        
+        .transition-view {
+            transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        
+        .scrollbar-hidden::-webkit-scrollbar {
+            display: none;
+        }
+        
+        .scrollbar-hidden {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+        
+        .model-selector {
+            background: linear-gradient(135deg, #8b5cf6, #ec4899);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        
+        .funky-bg {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+        
+        .glow-button {
+            box-shadow: 0 0 15px rgba(139, 92, 246, 0.5);
+        }
+        
+        .code-container {
+            background: #1a202c;
+            font-family: 'Fira Code', 'Monaco', 'Menlo', monospace;
+        }
+        
+        pre {
+            margin: 0;
+            padding: 0;
+            background: transparent;
+        }
+        
+        code {
+            font-family: 'Fira Code', 'Monaco', 'Menlo', monospace;
+            font-size: 14px;
+            line-height: 1.5;
+        }
+        
+        .restore-btn {
+            background: linear-gradient(45deg, #ff6b6b, #ffa502);
+            transition: all 0.3s ease;
+        }
+        
+        .restore-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(255, 107, 107, 0.4);
+        }
+        
+        .download-btn {
+            background: linear-gradient(45deg, #10b981, #3b82f6);
+            transition: all 0.3s ease;
+        }
+        
+        .download-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(16, 185, 129, 0.4);
+        }
+        
+        .prompt-highlight {
+            background: linear-gradient(120deg, #a8edea 0%, #fed6e3 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        
+        .ai-message {
+            border-left: 3px solid #8b5cf6;
+        }
+        
+        .user-message {
+            border-right: 3px solid #ec4899;
+        }
+        
+        .loading-spinner {
+            width: 20px;
+            height: 20px;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            border-top-color: white;
+            animation: spin 1s ease-in-out infinite;
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        
+        /* CSS for code parsing and extraction */
+        .code-extractor {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            pointer-events: none;
+            z-index: 100;
+        }
+        
+        /* Make sure the iframe is properly sized */
+        .iframe-wrapper {
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+        }
+        
+        .iframe-wrapper iframe {
+            width: 100%;
+            height: 100%;
+            border: none;
+            background: white;
+        }
+    </style>
+</head>
+<body class="bg-gray-900 text-white h-screen overflow-hidden">
+    <!-- Initial View -->
+    <div id="initial-view" class="fixed inset-0 funky-bg flex items-center justify-center transition-view">
+        <div class="w-full max-w-2xl px-4">
+            <div class="text-center mb-8">
+                <h1 class="text-5xl md:text-6xl font-bold mb-4 animate-pulse">
+                    <span class="prompt-highlight">Lade</span> 
+                    <span class="text-white">Coder</span>
+                </h1>
+                <p class="text-gray-200 text-xl mb-2">AI-Powered Web Development</p>
+                <p class="text-gray-300 text-lg">Describe what you want to build. Magic happens next.</p>
+            </div>
+            <div class="flex gap-3 mb-4">
+                <select id="model-selector" class="model-selector flex-1 bg-white border-none rounded-xl px-4 py-3 text-lg focus:outline-none focus:ring-4 focus:ring-purple-300 transition-all">
+                    <option value="qwen">🚀 Qwen Coder (Fast)</option>
+                    <option value="kimi">🌟 Kimi Dev (Powerful)</option>
+                    <option value="huggingface">🤖 Hugging Face (Creative)</option>
+                </select>
+            </div>
+            <div class="flex gap-3">
+                <input 
+                    type="text" 
+                    id="initial-prompt-input" 
+                    placeholder="e.g., Build a portfolio website with dark theme and animations..." 
+                    class="flex-1 bg-white text-gray-800 border-none rounded-xl px-6 py-4 text-lg focus:outline-none focus:ring-4 focus:ring-purple-300 transition-all"
+                >
+                <button 
+                    id="initial-send-button" 
+                    class="glow-button bg-gradient-to-r from-purple-600 to-pink-500 hover:from-purple-700 hover:to-pink-600 rounded-xl p-4 transition-all transform hover:scale-105"
+                >
+                    <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <line x1="22" y1="2" x2="11" y2="13"></line>
+                        <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+                    </svg>
+                </button>
+            </div>
+            <div class="mt-6 text-center">
+                <p class="text-gray-300 text-sm">✨ Powered by multiple AI models for best results</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Workspace -->
+    <div id="main-workspace" class="hidden h-screen flex transition-view">
+        <!-- Control Panel (Left) -->
+        <div id="control-panel" class="w-full md:w-1/3 lg:w-1/4 flex flex-col bg-gray-800 border-r border-gray-700">
+            <!-- Conversation Thread -->
+            <div id="conversation-thread" class="flex-1 overflow-y-auto p-4 space-y-4 scrollbar-hidden">
+                <!-- Messages will be inserted here -->
+            </div>
+            
+            <!-- Omni-Prompt Bar -->
+            <div id="omni-prompt-bar" class="p-4 border-t border-gray-700 bg-gray-800">
+                <div class="flex gap-2 mb-2">
+                    <select id="omni-model-selector" class="model-selector bg-white text-gray-800 border-none rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 transition-all">
+                        <option value="qwen">🚀 Qwen Coder</option>
+                        <option value="kimi">🌟 Kimi Dev</option>
+                        <option value="huggingface">🤖 Hugging Face</option>
+                    </select>
+                </div>
+                <div class="flex gap-2">
+                    <input 
+                        type="text" 
+                        id="omni-prompt-input" 
+                        placeholder="Modify existing code: Add a contact form..." 
+                        class="flex-1 bg-gray-700 border-none rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-purple-500 transition-all"
+                    >
+                    <button 
+                        id="omni-send-button" 
+                        class="bg-gradient-to-r from-purple-600 to-pink-500 hover:from-purple-700 hover:to-pink-600 rounded-lg p-3 transition-all"
+                    >
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <line x1="22" y1="2" x2="11" y2="13"></line>
+                            <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Canvas Panel (Right) -->
+        <div id="canvas-panel" class="flex-1 flex flex-col bg-gray-900">
+            <!-- Tabs -->
+            <div class="flex border-b border-gray-700 bg-gray-800">
+                <button 
+                    id="preview-tab" 
+                    class="px-6 py-4 font-bold border-b-2 border-purple-500 text-white flex items-center gap-2"
+                >
+                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                        <circle cx="12" cy="12" r="3"></circle>
+                    </svg>
+                    Preview
+                </button>
+                <button 
+                    id="code-tab" 
+                    class="px-6 py-4 font-bold text-gray-400 hover:text-white transition-colors flex items-center gap-2"
+                >
+                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <polyline points="16 18 22 12 16 6"></polyline>
+                        <polyline points="8 6 2 12 8 18"></polyline>
+                    </svg>
+                    Code
+                </button>
+                <div class="flex-1"></div>
+                <button 
+                    id="download-button" 
+                    class="download-btn mx-2 my-2 px-4 py-2 rounded-lg text-white font-bold flex items-center gap-2 hidden"
+                >
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                        <polyline points="7 10 12 15 17 10"></polyline>
+                        <line x1="12" y1="15" x2="12" y2="3"></line>
+                    </svg>
+                    Download
+                </button>
+                <button 
+                    id="restore-button" 
+                    class="restore-btn mx-2 my-2 px-4 py-2 rounded-lg text-white font-bold flex items-center gap-2 hidden"
+                >
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"></path>
+                        <path d="M21 3v5h-5"></path>
+                        <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"></path>
+                        <path d="M3 21v-5h5"></path>
+                    </svg>
+                    Restore
+                </button>
+            </div>
+
+            <!-- Content Area -->
+            <div class="flex-1 relative">
+                <!-- Preview Container -->
+                <div id="preview-container" class="absolute inset-0">
+                    <div class="iframe-wrapper">
+                        <iframe 
+                            id="preview-frame" 
+                            class="w-full h-full bg-white"
+                            title="Preview"
+                        ></iframe>
+                    </div>
+                </div>
+
+                <!-- Code Container -->
+                <div id="code-container" class="absolute inset-0 hidden">
+                    <pre class="h-full overflow-auto p-4 code-container"><code id="code-block"></code></pre>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // API Keys
+        const OPENROUTER_API_KEY = "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";
+        const HUGGINGFACE_API_KEY = "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";
+        
+        // DOM Elements
+        const initialView = document.getElementById('initial-view');
+        const mainWorkspace = document.getElementById('main-workspace');
+        const initialPromptInput = document.getElementById('initial-prompt-input');
+        const initialSendButton = document.getElementById('initial-send-button');
+        const modelSelector = document.getElementById('model-selector');
+        const conversationThread = document.getElementById('conversation-thread');
+        const omniPromptInput = document.getElementById('omni-prompt-input');
+        const omniSendButton = document.getElementById('omni-send-button');
+        const omniModelSelector = document.getElementById('omni-model-selector');
+        const previewTab = document.getElementById('preview-tab');
+        const codeTab = document.getElementById('code-tab');
+        const previewContainer = document.getElementById('preview-container');
+        const codeContainer = document.getElementById('code-container');
+        const codeBlock = document.getElementById('code-block');
+        const previewFrame = document.getElementById('preview-frame');
+        const restoreButton = document.getElementById('restore-button');
+        const downloadButton = document.getElementById('download-button');
+
+        // State management
+        let currentCode = '';
+        let codeHistory = [];
+        let isGenerating = false;
+        let conversationHistory = [];
+
+        // Optimized mock code snippets for faster loading
+        const mockCodeSnippets = [
+            `<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Modern Portfolio</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Inter', sans-serif; background: linear-gradient(135deg, #1a202c, #2d3748); color: #e2e8f0; min-height: 100vh; }
+        .container { max-width: 1200px; margin: 0 auto; padding: 2rem; }
+        header { display: flex; justify-content: space-between; align-items: center; padding: 1rem 0; }
+        .logo { font-size: 1.8rem; font-weight: bold; background: linear-gradient(45deg, #8b5cf6, #ec4899); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+        nav a { margin: 0 1rem; color: #a0aec0; text-decoration: none; transition: color 0.3s; }
+        nav a:hover { color: #fff; }
+        .hero { text-align: center; padding: 5rem 0; }
+        .hero h1 { font-size: 3.5rem; margin-bottom: 1rem; }
+        .hero p { font-size: 1.3rem; max-width: 600px; margin: 0 auto 2rem; color: #cbd5e0; }
+        .btn { background: linear-gradient(45deg, #8b5cf6, #ec4899); color: white; padding: 14px 30px; border-radius: 30px; text-decoration: none; font-weight: bold; display: inline-block; transition: transform 0.3s; }
+        .btn:hover { transform: translateY(-3px); box-shadow: 0 10px 20px rgba(139, 92, 246, 0.3); }
+        .features { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 2rem; margin: 4rem 0; }
+        .feature { background: rgba(255, 255, 255, 0.05); padding: 2rem; border-radius: 15px; backdrop-filter: blur(10px); transition: transform 0.3s; }
+        .feature:hover { transform: translateY(-10px); }
+        .feature h3 { font-size: 1.5rem; margin-bottom: 1rem; color: #c7d2fe; }
+        footer { text-align: center; padding: 2rem 0; color: #a0aec0; border-top: 1px solid rgba(255, 255, 255, 0.1); }
+        @media (max-width: 768px) { 
+            .hero h1 { font-size: 2.5rem; }
+            header { flex-direction: column; }
+            nav { margin-top: 1rem; }
+            nav a { margin: 0 0.5rem; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div class="logo">Portfolio</div>
+            <nav>
+                <a href="#">Home</a>
+                <a href="#">Work</a>
+                <a href="#">About</a>
+                <a href="#">Contact</a>
+            </nav>
+        </header>
+        <section class="hero">
+            <h1>Hi, I'm Alex</h1>
+            <p>Full-stack developer creating amazing web experiences</p>
+            <a href="#" class="btn">View My Work</a>
+        </section>
+        <section class="features">
+            <div class="feature">
+                <h3>Web Development</h3>
+                <p>Building responsive and modern websites with cutting-edge technologies</p>
+            </div>
+            <div class="feature">
+                <h3>UI/UX Design</h3>
+                <p>Creating intuitive and beautiful user interfaces that delight users</p>
+            </div>
+            <div class="feature">
+                <h3>Performance</h3>
+                <p>Optimizing websites for speed and best user experience</p>
+            </div>
+        </section>
+        <footer>
+            <p>&copy; 2023 Alex Portfolio. All rights reserved.</p>
+        </footer>
+    </div>
+</body>
+</html>`,
+            `<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Enhanced Portfolio</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Inter', sans-serif; background: linear-gradient(135deg, #0f172a, #1e293b); color: #e2e8f0; min-height: 100vh; }
+        .container { max-width: 1200px; margin: 0 auto; padding: 2rem; }
+        header { display: flex; justify-content: space-between; align-items: center; padding: 1rem 0; }
+        .logo { font-size: 1.8rem; font-weight: bold; background: linear-gradient(45deg, #06b6d4, #3b82f6); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+        nav a { margin: 0 1rem; color: #94a3b8; text-decoration: none; transition: color 0.3s; position: relative; }
+        nav a:hover { color: #fff; }
+        nav a::after { content: ''; position: absolute; bottom: -5px; left: 0; width: 0; height: 2px; background: linear-gradient(45deg, #06b6d4, #3b82f6); transition: width 0.3s; }
+        nav a:hover::after { width: 100%; }
+        .hero { text-align: center; padding: 5rem 0; }
+        .hero h1 { font-size: 3.5rem; margin-bottom: 1rem; }
+        .hero p { font-size: 1.3rem; max-width: 600px; margin: 0 auto 2rem; color: #cbd5e0; }
+        .btn { background: linear-gradient(45deg, #06b6d4, #3b82f6); color: white; padding: 14px 30px; border-radius: 30px; text-decoration: none; font-weight: bold; display: inline-block; transition: all 0.3s; }
+        .btn:hover { transform: translateY(-3px); box-shadow: 0 10px 20px rgba(6, 182, 212, 0.3); }
+        .features { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 2rem; margin: 4rem 0; }
+        .feature { background: rgba(255, 255, 255, 0.05); padding: 2rem; border-radius: 15px; backdrop-filter: blur(10px); transition: all 0.3s; }
+        .feature:hover { transform: translateY(-10px); box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3); }
+        .feature h3 { font-size: 1.5rem; margin-bottom: 1rem; color: #bae6fd; }
+        .projects { margin: 4rem 0; }
+        .projects h2 { text-align: center; font-size: 2.5rem; margin-bottom: 2rem; }
+        .project-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(350px, 1fr)); gap: 2rem; }
+        .project { background: rgba(255, 255, 255, 0.05); border-radius: 15px; overflow: hidden; transition: transform 0.3s; }
+        .project:hover { transform: translateY(-5px); }
+        .project-img { height: 200px; background: linear-gradient(45deg, #8b5cf6, #ec4899); }
+        .project-content { padding: 1.5rem; }
+        footer { text-align: center; padding: 2rem 0; color: #94a3b8; border-top: 1px solid rgba(255, 255, 255, 0.1); }
+        @media (max-width: 768px) { 
+            .hero h1 { font-size: 2.5rem; }
+            header { flex-direction: column; }
+            nav { margin-top: 1rem; }
+            nav a { margin: 0 0.5rem; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div class="logo">Alex.Dev</div>
+            <nav>
+                <a href="#">Home</a>
+                <a href="#">Projects</a>
+                <a href="#">Skills</a>
+                <a href="#">Contact</a>
+            </nav>
+        </header>
+        <section class="hero">
+            <h1>Full-Stack Developer & Designer</h1>
+            <p>Creating digital experiences that blend creativity with cutting-edge technology</p>
+            <a href="#" class="btn">Explore My Work</a>
+        </section>
+        <section class="features">
+            <div class="feature">
+                <h3>Web Development</h3>
+                <p>Building responsive and modern websites with React, Vue, and Node.js</p>
+            </div>
+            <div class="feature">
+                <h3>UI/UX Design</h3>
+                <p>Creating intuitive and beautiful user interfaces that delight users</p>
+            </div>
+            <div class="feature">
+                <h3>Performance</h3>
+                <p>Optimizing websites for speed and best user experience</p>
+            </div>
+        </section>
+        <section class="projects">
+            <h2>Featured Projects</h2>
+            <div class="project-grid">
+                <div class="project">
+                    <div class="project-img"></div>
+                    <div class="project-content">
+                        <h3>E-Commerce Platform</h3>
+                        <p>Full-featured online store with payment integration</p>
+                    </div>
+                </div>
+                <div class="project">
+                    <div class="project-img"></div>
+                    <div class="project-content">
+                        <h3>Social Media Dashboard</h3>
+                        <p>Analytics dashboard for social media management</p>
+                    </div>
+                </div>
+                <div class="project">
+                    <div class="project-img"></div>
+                    <div class="project-content">
+                        <h3>Task Management App</h3>
+                        <p>Collaborative task management with real-time updates</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+        <footer>
+            <p>&copy; 2023 Alex Developer. All rights reserved.</p>
+        </footer>
+    </div>
+</body>
+</html>`
+        ];
+
+        // Add message to chat
+        function addMessageToChat(text, sender) {
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message-animation ${sender === 'user' ? 'user-message text-right' : 'ai-message text-left'}`;
+            
+            const bubbleDiv = document.createElement('div');
+            bubbleDiv.className = `inline-block max-w-xs lg:max-w-md px-4 py-3 rounded-lg ${
+                sender === 'user' 
+                    ? 'bg-gradient-to-r from-purple-600 to-pink-500 text-white rounded-br-none' 
+                    : 'bg-gray-700 text-white rounded-bl-none'
+            }`;
+            bubbleDiv.textContent = text;
+            
+            messageDiv.appendChild(bubbleDiv);
+            conversationThread.appendChild(messageDiv);
+            
+            // Scroll to bottom
+            conversationThread.scrollTop = conversationThread.scrollHeight;
+        }
+
+        // Add typing indicator
+        function addTypingIndicator() {
+            const typingDiv = document.createElement('div');
+            typingDiv.id = 'typing-indicator';
+            typingDiv.className = 'text-left ai-message';
+            
+            const bubbleDiv = document.createElement('div');
+            bubbleDiv.className = 'inline-block px-4 py-3 rounded-lg bg-gray-700 text-white rounded-bl-none';
+            bubbleDiv.innerHTML = `
+                <div class="flex space-x-1">
+                    <div class="w-2 h-2 bg-gray-300 rounded-full animate-bounce"></div>
+                    <div class="w-2 h-2 bg-gray-300 rounded-full animate-bounce" style="animation-delay: 0.2s"></div>
+                    <div class="w-2 h-2 bg-gray-300 rounded-full animate-bounce" style="animation-delay: 0.4s"></div>
+                </div>
+            `;
+            
+            typingDiv.appendChild(bubbleDiv);
+            conversationThread.appendChild(typingDiv);
+            conversationThread.scrollTop = conversationThread.scrollHeight;
+        }
+
+        // Remove typing indicator
+        function removeTypingIndicator() {
+            const typingIndicator = document.getElementById('typing-indicator');
+            if (typingIndicator) {
+                typingIndicator.remove();
+            }
+        }
+
+        // Extract HTML code from response (handles cases where AI returns explanation + code)
+        function extractHTMLCode(responseText) {
+            // Look for HTML code blocks in the response
+            const htmlRegex = /<\!DOCTYPE\s+html[^>]*>/i;
+            const match = responseText.match(htmlRegex);
+            
+            if (match) {
+                // Find the start of the HTML code
+                const startIndex = responseText.indexOf(match[0]);
+                
+                // Try to find the end of the HTML code
+                const endIndex = responseText.lastIndexOf('</html>');
+                if (endIndex > startIndex) {
+                    return responseText.substring(startIndex, endIndex + 7);
+                }
+            }
+            
+            // If no HTML found, try to find code block with language html
+            const codeRegex = /```html\s*([\s\S]*?)```/i;
+            const codeMatch = responseText.match(codeRegex);
+            
+            if (codeMatch && codeMatch[1]) {
+                return codeMatch[1];
+            }
+            
+            // If still no HTML found, look for any HTML-like content
+            const htmlLikeRegex = /<html[^>]*>([\s\S]*)<\/html>/i;
+            const htmlLikeMatch = responseText.match(htmlLikeRegex);
+            
+            if (htmlLikeMatch && htmlLikeMatch[1]) {
+                return htmlLikeMatch[1];
+            }
+            
+            // As last resort, return the entire response if it looks like HTML
+            if (responseText.includes('<html') || responseText.includes('<body')) {
+                return responseText;
+            }
+            
+            // Return empty string if no code could be extracted
+            return '';
+        }
+
+        // Update output (code and preview)
+        function updateOutput(htmlContent) {
+            // Save current code to history before updating
+            if (currentCode) {
+                codeHistory.push(currentCode);
+                restoreButton.classList.remove('hidden');
+            }
+            
+            // Extract actual HTML code from the response
+            const extractedCode = extractHTMLCode(htmlContent);
+            
+            if (extractedCode) {
+                currentCode = extractedCode;
+                
+                // Update code block with raw code only
+                codeBlock.textContent = extractedCode;
+                
+                // Update preview iframe
+                previewFrame.srcdoc = extractedCode;
+                
+                // Show download button when code is available
+                downloadButton.classList.remove('hidden');
+            } else {
+                // If no valid code was extracted, show error
+                console.error("Could not extract valid HTML code from response");
+                currentCode = '';
+                codeBlock.textContent = 'Error: Could not extract valid HTML code from the AI response.';
+                previewFrame.srcdoc = '<div style="padding: 20px; color: red;">Error: Could not extract valid HTML code from the AI response.</div>';
+            }
+        }
+
+        // Download code as HTML file
+        function downloadCode() {
+            if (!currentCode) return;
+            
+            const blob = new Blob([currentCode], { type: 'text/html' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'lade-coder-project.html';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+
+        // Restore previous code
+        function restorePreviousCode() {
+            if (codeHistory.length > 0) {
+                const previousCode = codeHistory.pop();
+                currentCode = previousCode;
+                updateOutput(previousCode);
+                
+                if (codeHistory.length === 0) {
+                    restoreButton.classList.add('hidden');
+                }
+                
+                addMessageToChat("✅ Restored to previous version", 'ai');
+            }
+        }
+
+        // Generate code using OpenRouter Qwen model (optimized for speed)
+        async function generateCodeWithQwen(prompt, isFollowUp = false) {
+            try {
+                let content = prompt;
+                if (isFollowUp && currentCode) {
+                    content = `Modify the following HTML/CSS/JS code based on this request: ${prompt}\n\nReturn only the complete modified code, no explanations.`;
+                } else {
+                    content = `Generate only HTML/CSS/JS code for: ${prompt}. Return only the code, no explanations.`;
+                }
+                
+                const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+                    method: "POST",
+                    headers: {
+                        "Authorization": `Bearer ${OPENROUTER_API_KEY}`,
+                        "HTTP-Referer": window.location.href,
+                        "X-Title": "Lade Coder",
+                        "Content-Type": "application/json"
+                    },
+                    body: JSON.stringify({
+                        "model": "qwen/qwen3-coder:free",
+                        "messages": [
+                            {
+                                "role": "user",
+                                "content": content
+                            }
+                        ],
+                        "temperature": 0.7,
+                        "max_tokens": 2000
+                    })
+                });
+                
+                const data = await response.json();
+                return data.choices[0].message.content;
+            } catch (error) {
+                console.error("Qwen API Error:", error);
+                return "Error generating code with Qwen. Please try again.";
+            }
+        }
+
+        // Generate code using OpenRouter Kimi model (more powerful)
+        async function generateCodeWithKimi(prompt, isFollowUp = false) {
+            try {
+                let content = prompt;
+                if (isFollowUp && currentCode) {
+                    content = `Modify the following HTML/CSS/JS code based on this request: ${prompt}\n\nReturn only the complete modified code, no explanations.`;
+                } else {
+                    content = `Generate only HTML/CSS/JS code for: ${prompt}. Return only the code, no explanations.`;
+                }
+                
+                const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+                    method: "POST",
+                    headers: {
+                        "Authorization": `Bearer ${OPENROUTER_API_KEY}`,
+                        "HTTP-Referer": window.location.href,
+                        "X-Title": "Lade Coder",
+                        "Content-Type": "application/json"
+                    },
+                    body: JSON.stringify({
+                        "model": "moonshotai/kimi-dev-72b:free",
+                        "messages": [
+                            {
+                                "role": "user",
+                                "content": content
+                            }
+                        ],
+                        "temperature": 0.7,
+                        "max_tokens": 2500
+                    })
+                });
+                
+                const data = await response.json();
+                return data.choices[0].message.content;
+            } catch (error) {
+                console.error("Kimi API Error:", error);
+                return "Error generating code with Kimi. Please try again.";
+            }
+        }
+
+        // Generate code using Hugging Face (creative)
+        async function generateCodeWithHuggingFace(prompt, isFollowUp = false) {
+            try {
+                let content = prompt;
+                if (isFollowUp && currentCode) {
+                    content = `Modify the following HTML/CSS/JS code based on this request: ${prompt}\n\nReturn only the complete modified code, no explanations.`;
+                } else {
+                    content = `Generate HTML/CSS/JS code for: ${prompt}. Return only the code.`;
+                }
+                
+                const response = await fetch("https://api-inference.huggingface.co/models/microsoft/Phi-3-mini-4k-instruct", {
+                    method: "POST",
+                    headers: {
+                        "Authorization": `Bearer ${HUGGINGFACE_API_KEY}`,
+                        "Content-Type": "application/json"
+                    },
+                    body: JSON.stringify({
+                        "inputs": content,
+                        "parameters": {
+                            "max_new_tokens": 1500,
+                            "temperature": 0.7
+                        }
+                    })
+                });
+                
+                const data = await response.json();
+                return data[0].generated_text;
+            } catch (error) {
+                console.error("Hugging Face API Error:", error);
+                return "Error generating code with Hugging Face. Please try again.";
+            }
+        }
+
+        // Handle code generation based on selected model
+        async function generateCode(prompt, model, isFollowUp = false) {
+            switch(model) {
+                case 'qwen':
+                    return await generateCodeWithQwen(prompt, isFollowUp);
+                case 'kimi':
+                    return await generateCodeWithKimi(prompt, isFollowUp);
+                case 'huggingface':
+                    return await generateCodeWithHuggingFace(prompt, isFollowUp);
+                default:
+                    // For demo purposes, cycle through mock snippets
+                    if (isFollowUp) {
+                        return mockCodeSnippets[1];
+                    }
+                    return mockCodeSnippets[0];
+            }
+        }
+
+        // Handle initial prompt submission
+        async function handleInitialPrompt() {
+            const promptText = initialPromptInput.value.trim();
+            const selectedModel = modelSelector.value;
+            
+            if (!promptText || isGenerating) return;
+            
+            isGenerating = true;
+            initialSendButton.innerHTML = '<div class="loading-spinner"></div>';
+            
+            // Hide initial view and show main workspace
+            initialView.style.opacity = '0';
+            initialView.style.pointerEvents = 'none';
+            
+            setTimeout(async () => {
+                initialView.classList.add('hidden');
+                mainWorkspace.classList.remove('hidden');
+                
+                // Add user message
+                addMessageToChat(promptText, 'user');
+                
+                // Add typing indicator
+                addTypingIndicator();
+                
+                // Generate code
+                const generatedCode = await generateCode(promptText, selectedModel, false);
+                
+                // Remove typing indicator
+                removeTypingIndicator();
+                
+                // Add AI response
+                addMessageToChat("✨ I've created your website! Check the preview and code tabs.", 'ai');
+                
+                // Update code and preview
+                updateOutput(generatedCode);
+                
+                // Reset button
+                initialSendButton.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>';
+                
+                isGenerating = false;
+            }, 100);
+        }
+
+        // Handle omni prompt submission (follow-up)
+        async function handleOmniPrompt() {
+            const promptText = omniPromptInput.value.trim();
+            const selectedModel = omniModelSelector.value;
+            
+            if (!promptText || isGenerating) return;
+            
+            isGenerating = true;
+            omniSendButton.innerHTML = '<div class="loading-spinner"></div>';
+            
+            // Add user message
+            addMessageToChat(promptText, 'user');
+            omniPromptInput.value = '';
+            
+            // Add typing indicator
+            addTypingIndicator();
+            
+            // Generate code with follow-up context
+            const generatedCode = await generateCode(promptText, selectedModel, true);
+            
+            // Remove typing indicator
+            removeTypingIndicator();
+            
+            // Add AI response
+            addMessageToChat("✅ I've updated your website based on your request!", 'ai');
+            
+            // Update code and preview
+            updateOutput(generatedCode);
+            
+            // Reset button
+            omniSendButton.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>';
+            
+            isGenerating = false;
+        }
+
+        // Switch tabs
+        function switchTab(tab) {
+            if (tab === 'preview') {
+                previewTab.className = 'px-6 py-4 font-bold border-b-2 border-purple-500 text-white flex items-center gap-2';
+                codeTab.className = 'px-6 py-4 font-bold text-gray-400 hover:text-white transition-colors flex items-center gap-2';
+                previewContainer.classList.remove('hidden');
+                codeContainer.classList.add('hidden');
+            } else {
+                codeTab.className = 'px-6 py-4 font-bold border-b-2 border-purple-500 text-white flex items-center gap-2';
+                previewTab.className = 'px-6 py-4 font-bold text-gray-400 hover:text-white transition-colors flex items-center gap-2';
+                codeContainer.classList.remove('hidden');
+                previewContainer.classList.add('hidden');
+            }
+        }
+
+        // Event Listeners
+        initialSendButton.addEventListener('click', handleInitialPrompt);
+        initialPromptInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') handleInitialPrompt();
+        });
+
+        omniSendButton.addEventListener('click', handleOmniPrompt);
+        omniPromptInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') handleOmniPrompt();
+        });
+
+        previewTab.addEventListener('click', () => switchTab('preview'));
+        codeTab.addEventListener('click', () => switchTab('code'));
+        restoreButton.addEventListener('click', restorePreviousCode);
+        downloadButton.addEventListener('click', downloadCode);
+    </script>
+</body>
+</html>
